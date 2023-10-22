@@ -58,7 +58,8 @@ exports.ExposeStore = (moduleRaidStr) => {
     window.Store.LidUtils = window.mR.findModule('getCurrentLid')[0];
     window.Store.WidToJid = window.mR.findModule('widToUserJid')[0];
     window.Store.JidToWid = window.mR.findModule('userJidToUserWid')[0];
-    
+    window.Store.MediaBlobCache = window.mR.findModule('MediaBlobCache')[0] ? window.mR.findModule('MediaBlobCache')[0].MediaBlobCache : window.mR.findModule('InMemoryMediaBlobCache')[0].InMemoryMediaBlobCache;
+
     /* eslint-disable no-undef, no-cond-assign */
     window.Store.QueryExist = ((m = window.mR.findModule('queryExists')[0]) ? m.queryExists : window.mR.findModule('queryExist')[0].queryWidExists);
     window.Store.ReplyUtils = (m = window.mR.findModule('canReplyMsg')).length > 0 && m[0];
