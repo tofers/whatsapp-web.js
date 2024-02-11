@@ -944,6 +944,39 @@ class Client extends EventEmitter {
             );
         }
 
+        if (internalOptions.attachment?.filesize > 50000000) {
+            let startDivision = 2;
+            let middle = internalOptions.attachment.data.length / startDivision;
+            let currentIndex = 0;
+
+
+            while (middle > (1024 * 1024 * 50)){
+                startDivision += 1;
+                middle = Math.floor(internalOptions.attachment.data.length / startDivision);
+            }
+
+            const randomId = Util.generateHash(32);
+
+            while(currentIndex < internalOptions.attachment.data.length){
+                let chunkPiece = middle;
+                if(currentIndex + middle > internalOptions.attachment.data.length){
+                    chunkPiece = internalOptions.attachment.data.length - currentIndex;
+                }
+                await this.pupPage.evaluate(async (chatId, chunk, randomId) => {
+                    if (chunk && window[`mediaChunk_${randomId}`]) {
+                        window[`mediaChunk_${randomId}`] += chunk;
+                    }
+                    else {
+                        window[`mediaChunk_${randomId}`] = chunk;
+                    }
+                }, chatId, internalOptions.attachment.data.substring(currentIndex, currentIndex+chunkPiece), randomId);
+                currentIndex += chunkPiece;
+
+            }
+
+            internalOptions.attachment = new MessageMedia(internalOptions.attachment.mimetype,`mediaChunk_${randomId}`, internalOptions.attachment.filename,internalOptions.attachment.filesize);
+        }
+
         const newMessage = await this.pupPage.evaluate(async (chatId, message, options, sendSeen) => {
             const chatWid = window.Store.WidFactory.createWid(chatId);
             const chat = await window.Store.Chat.find(chatWid);
@@ -951,6 +984,11 @@ class Client extends EventEmitter {
 
             if (sendSeen) {
                 await window.WWebJS.sendSeen(chatId);
+            }
+
+            if(options?.attachment?.data?.startsWith('mediaChunk')) {
+                options.attachment.data = window[options.attachment.data];
+                delete window[options.attachment.data];
             }
 
             const msg = await window.WWebJS.sendMessage(chat, message, options, sendSeen);
@@ -1594,6 +1632,19 @@ class Client extends EventEmitter {
         }, labelIds, chatIds);
     }
 
+    /***
+     * Returns the maximum file size for the given MessageType
+     * @param {string} messageType (valid values are = 'audio', 'document', 'video', 'sticker')
+     * @returns {Promise<string>}
+     */
+    async getUploadLimits(messageType) {
+        const uploadLimit = await this.pupPage.evaluate(async (messageType) => {
+            return await window.WWebJS.getUploadLimits(messageType);
+        }, messageType);
+
+        return uploadLimit;
+    }
+    
     /**
      * An object that handles the information about the group membership request
      * @typedef {Object} GroupMembershipRequest

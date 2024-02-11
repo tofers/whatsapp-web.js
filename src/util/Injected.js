@@ -61,6 +61,7 @@ exports.ExposeStore = (moduleRaidStr) => {
     window.Store.getMsgInfo = (window.mR.findModule('sendQueryMsgInfo')[0] || {}).sendQueryMsgInfo || window.mR.findModule('queryMsgInfo')[0].queryMsgInfo;
     window.Store.pinUnpinMsg = window.mR.findModule('sendPinInChatMsg')[0].sendPinInChatMsg;
     window.Store.MediaBlobCache = window.mR.findModule('MediaBlobCache')[0] ? window.mR.findModule('MediaBlobCache')[0].MediaBlobCache : window.mR.findModule('InMemoryMediaBlobCache')[0].InMemoryMediaBlobCache;
+    window.Store.UploadLimits = window.mR.findModule('getUploadLimit')[0].getUploadLimit;
     
     /* eslint-disable no-undef, no-cond-assign */
     window.Store.QueryExist = ((m = window.mR.findModule('queryExists')[0]) ? m.queryExists : window.mR.findModule('queryExist')[0].queryWidExists);
@@ -162,6 +163,11 @@ exports.LoadUtils = () => {
 
     };
 
+    window.WWebJS.getUploadLimits = async (messageType) => {
+        const uploadLimit = window.Store.UploadLimits(messageType);
+        return uploadLimit;
+    };
+    
     window.WWebJS.sendMessage = async (chat, content, options = {}) => {
         let attOptions = {};
         if (options.attachment) {
@@ -170,7 +176,8 @@ exports.LoadUtils = () => {
                 : await window.WWebJS.processMediaData(options.attachment, {
                     forceVoice: options.sendAudioAsVoice,
                     forceDocument: options.sendMediaAsDocument,
-                    forceGif: options.sendVideoAsGif
+                    forceGif: options.sendVideoAsGif,
+                    isViewOnce: options.isViewOnce
                 });
             
             attOptions.caption = options.caption;
@@ -465,13 +472,19 @@ exports.LoadUtils = () => {
         return stickerInfo;
     };
 
-    window.WWebJS.processMediaData = async (mediaInfo, { forceVoice, forceDocument, forceGif }) => {
+    window.WWebJS.processMediaData = async (mediaInfo, { forceVoice, forceDocument, forceGif, isViewOnce }) => {
         const file = window.WWebJS.mediaInfoToFile(mediaInfo);
         const mData = await window.Store.OpaqueData.createFromData(file, file.type);
         const mediaPrep = window.Store.MediaPrep.prepRawMedia(mData, { asDocument: forceDocument });
         const mediaData = await mediaPrep.waitForPrep();
         const mediaObject = window.Store.MediaObject.getOrCreateMediaObject(mediaData.filehash);
-
+        const uploadOrigin = 2;
+        const forwardedFromWeb = false;
+        const maxFileSize = window.Store.UploadLimits(mediaData.type);
+        const mediaKeyInfoTimestamp = Date.now();
+        let mediaKeyInfoKey = await window.WWebJS.generateHash(32);
+        let uploadedMedia = {};
+        
         const mediaType = window.Store.MediaTypes.msgToMediaType({
             type: mediaData.type,
             isGif: mediaData.isGif
@@ -482,6 +495,14 @@ exports.LoadUtils = () => {
             const waveform = mediaObject.contentInfo.waveform;
             mediaData.waveform =
                 waveform ?? await window.WWebJS.generateWaveform(file);
+        }
+
+        if(!isViewOnce){
+            isViewOnce = false;
+        }
+
+        if(mediaInfo.filesize && maxFileSize > mediaInfo.file){
+            throw new Error('Media size (' +mediaInfo.filesize +') exceeds current upload limit (' + maxFileSize + ')');
         }
 
         if (forceGif && mediaData.type === 'video') {
@@ -499,16 +520,44 @@ exports.LoadUtils = () => {
         mediaData.renderableUrl = mediaData.mediaBlob.url();
         mediaObject.consolidate(mediaData.toJSON());
         mediaData.mediaBlob.autorelease();
+        if(mediaInfo.filesize > 50000000){
+            uploadedMedia = await window.Store.MediaUpload.uploadMedia({
+                mimetype: mediaData.mimetype,
+                mediaObject,
+                mediaType,
+                isViewOnce,
+                uploadOrigin,
+                forwardedFromWeb,
+                mediaKeyInfo: { key: mediaKeyInfoKey, timestamp: mediaKeyInfoTimestamp }
+            });
+        }else {
+            uploadedMedia = await window.Store.MediaUpload.uploadMedia({
+                mimetype: mediaData.mimetype,
+                mediaObject,
+                mediaType,
+                isViewOnce,
+                uploadOrigin,
+                forwardedFromWeb
+            });
+        }
 
-        const uploadedMedia = await window.Store.MediaUpload.uploadMedia({
-            mimetype: mediaData.mimetype,
-            mediaObject,
-            mediaType
-        });
-
-        const mediaEntry = uploadedMedia.mediaEntry;
+        let mediaEntry = uploadedMedia.mediaEntry;
         if (!mediaEntry) {
-            throw new Error('upload failed: media entry was not created');
+            if(mediaInfo.filesize > 50000000){
+                uploadedMedia = await window.Store.MediaUpload.uploadMedia({
+                    mimetype: mediaData.mimetype,
+                    mediaObject,
+                    mediaType,
+                    isViewOnce,
+                    uploadOrigin,
+                    forwardedFromWeb
+                });
+                mediaEntry = uploadedMedia.mediaEntry;
+            }
+
+            if(!mediaEntry){
+                throw new Error('upload failed: media entry was not created');
+            }
         }
 
         mediaData.set({
