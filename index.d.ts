@@ -353,6 +353,10 @@ declare namespace WAWebJS {
         /** Emitted when loading screen is appearing */
         on(event: 'loading_screen', listener: (percent: string, message: string) => void): this
 
+        on(event: 'vote_received', listener: (
+            vote: PollVote
+        ) => void): this
+        
         /** Emitted when the QR code is received */
         on(event: 'qr', listener: (
             /** qr code string
@@ -995,6 +999,33 @@ declare namespace WAWebJS {
         constructor(latitude: number, longitude: number, options?: LocationSendOptions)
     }
 
+    /** Represents a Poll Vote on WhatsApp */
+    export interface PollVote {
+        /** The person who voted */
+        voter: string;
+
+        /** Indicates if the vote was unvoted, if true the selected option was unvoted */
+        isUnvote: boolean;
+
+        /** The selected poll option */
+        selectedOption: SelectedPollOption;
+
+        /** Timestamp the the poll was voted */
+        votedAtTimestamp: number;
+
+        /** The poll creation message associated with the poll vote */
+        parentMessage: Message;
+    }
+
+    /** Selected poll option structure */
+    export interface SelectedPollOption {
+        /** The local selected option ID */
+        id: number;
+
+        /** The option name */
+        name: string;
+    }
+    
     /** Poll send options */
     export interface PollSendOptions {
         /** False for a single choice poll, true for a multiple choice poll (false by default) */
