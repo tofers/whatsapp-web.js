@@ -11,7 +11,7 @@ const { ExposeStore, LoadUtils } = require('./util/Injected');
 const ChatFactory = require('./factories/ChatFactory');
 const ContactFactory = require('./factories/ContactFactory');
 const WebCacheFactory = require('./webCache/WebCacheFactory');
-const { ClientInfo, Message, MessageMedia, Contact, Location, Poll, GroupNotification, Label, Call, Buttons, List, Reaction } = require('./structures');
+const { ClientInfo, Message, MessageMedia, Contact, Location, Poll, PollVote, GroupNotification, Label, Call, Buttons, List, Reaction } = require('./structures');
 const LegacySessionAuth = require('./authStrategies/LegacySessionAuth');
 const NoAuth = require('./authStrategies/NoAuth');
 
@@ -54,6 +54,7 @@ const NoAuth = require('./authStrategies/NoAuth');
  * @fires Client#contact_changed
  * @fires Client#group_admin_changed
  * @fires Client#group_membership_request
+ * @fires Client#vote_received
  */
 class Client extends EventEmitter {
     constructor(options = {}) {
@@ -659,7 +660,24 @@ class Client extends EventEmitter {
              */
             this.emit(Events.CHAT_ARCHIVED, _chat, currState, prevState);
         });
-
+        await page.exposeFunction('onPollVoteEvent', (vote) => {
+            const _vote = new PollVote(this, vote);
+            /**
+             * Emitted when a poll vote is received
+             * @event Client#vote_received
+             * @param {Object} _vote The received vote
+             * @property {Object} _vote.sender Sender of the vote
+             * @property {string} _vote.sender.server
+             * @property {string} _vote.sender.user
+             * @property {string} _vote.sender._serialized
+             * @property {number} _vote.senderTimestampMs Timestamp the the poll was voted
+             * @property {Object} _vote.selectedOption The selected poll option
+             * @property {number} _vote.selectedOption.id The local selected option ID
+             * @property {string} _vote.selectedOption.name The option name
+             * @property {Message} _vote.parentMessage The vote parent message
+             */
+            this.emit(Events.VOTE_RECEIVED, _vote);
+        });
         await page.exposeFunction('onEditMessageEvent', (msg, newBody, prevBody) => {
             
             if(msg.type === 'revoked'){
@@ -707,6 +725,15 @@ class Client extends EventEmitter {
                         window.onAddMessageEvent(window.WWebJS.getMessageModel(msg)); 
                     }
                 }
+            });
+            window.Store.PollVote.on('add', async (vote) => {
+                let _vote;
+                if (vote.parentMsgKey) {
+                    _vote = vote.serialize();
+                    _vote.parentMessage = window.WWebJS.getMessageModel(await window.Store.Msg.get(vote.parentMsgKey));
+                    _vote.isUnvote = vote.isUnvote;
+                }
+                window.onPollVoteEvent(_vote);
             });
             window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
 

@@ -366,6 +366,10 @@ declare namespace WAWebJS {
             call: Call
         ) => void): this
 
+        on(event: 'vote_received', listener: (
+            vote: PollVote
+        ) => void): this
+        
         /** Emitted when the client has initialized and is ready to receive messages */
         on(event: 'ready', listener: () => void): this
 
@@ -1016,6 +1020,33 @@ declare namespace WAWebJS {
         options: PollSendOptions
 
         constructor(pollName: string, pollOptions: Array<string>, options?: PollSendOptions)
+    }
+
+    /** Represents a Poll Vote on WhatsApp */
+    export interface PollVote {
+        /** The person who voted */
+        voter: string;
+
+        /** Indicates if the vote was unvoted, if true the selected option was unvoted */
+        isUnvote: boolean;
+
+        /** The selected poll option */
+        selectedOption: SelectedPollOption;
+
+        /** Timestamp the the poll was voted */
+        votedAtTimestamp: number;
+
+        /** The poll creation message associated with the poll vote */
+        parentMessage: Message;
+    }
+
+    /** Selected poll option structure */
+    export interface SelectedPollOption {
+        /** The local selected option ID */
+        id: number;
+
+        /** The option name */
+        name: string;
     }
 
     export interface Label {
