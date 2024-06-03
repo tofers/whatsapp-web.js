@@ -388,9 +388,7 @@ declare namespace WAWebJS {
          * Emitted when some poll option is selected or deselected,
          * shows a user's current selected option(s) on the poll
          */
-        on(event: 'vote_update', listener: (
-            vote: PollVote
-        ) => void): this
+        on(event: 'vote_update', listener: ( vote: PollVote ) => void): this
     }
 
     /** Current connection information */
