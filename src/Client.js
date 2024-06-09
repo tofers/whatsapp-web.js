@@ -15,7 +15,7 @@ const { LoadUtils } = require('./util/Injected/Utils');
 const ChatFactory = require('./factories/ChatFactory');
 const ContactFactory = require('./factories/ContactFactory');
 const WebCacheFactory = require('./webCache/WebCacheFactory');
-const { ClientInfo, Message, MessageMedia, Contact, Location, Poll, GroupNotification, Label, Call, Buttons, List, Reaction } = require('./structures');
+const { ClientInfo, Message, MessageMedia, Contact, Location, Poll, PollVote, GroupNotification, Label, Call, Buttons, List, Reaction } = require('./structures');
 const NoAuth = require('./authStrategies/NoAuth');
 
 /**
@@ -57,6 +57,7 @@ const NoAuth = require('./authStrategies/NoAuth');
  * @fires Client#contact_changed
  * @fires Client#group_admin_changed
  * @fires Client#group_membership_request
+ * @fires Client#vote_update
  */
 class Client extends EventEmitter {
     constructor(options = {}) {
@@ -580,21 +581,15 @@ class Client extends EventEmitter {
                 }
             });
 
-            await this.pupPage.exposeFunction('onBatteryStateChangedEvent', (state) => {
-                const { battery, plugged } = state;
-
-                if (battery === undefined) return;
-
-                /**
-                 * Emitted when the battery percentage for the attached device changes. Will not be sent if using multi-device.
-                 * @event Client#change_battery
-                 * @param {object} batteryInfo
-                 * @param {number} batteryInfo.battery - The current battery percentage
-                 * @param {boolean} batteryInfo.plugged - Indicates if the phone is plugged in (true) or not (false)
-                 * @deprecated
-                 */
-                this.emit(Events.BATTERY_CHANGED, { battery, plugged });
-            });
+            await this.pupPage.exposeFunction('onPollVoteEvent', (vote) => {
+				const _vote = new PollVote(this, vote);
+				/**
+				 * Emitted when some poll option is selected or deselected,
+				 * shows a user's current selected option(s) on the poll
+				 * @event Client#vote_update
+				 */
+				this.emit(Events.VOTE_UPDATE, _vote);
+			});
 
             await this.pupPage.exposeFunction('onIncomingCall', (call) => {
                 /**
@@ -708,6 +703,10 @@ class Client extends EventEmitter {
                     }
                 }
             });
+			window.Store.PollVote.on('add', (vote) => {
+                const pollVoteModel = window.WWebJS.getPollVoteModel(vote);
+                pollVoteModel && window.onPollVoteEvent(pollVoteModel);
+            });
             window.Store.Chat.on('change:unreadCount', (chat) => {window.onChatUnreadCountEvent(chat);});
             {
                 const module = window.Store.createOrUpdateReactionsModule;
@@ -760,8 +759,10 @@ class Client extends EventEmitter {
     /**
      * Closes the client
      */
-    async destroy() {
-        await this.pupBrowser.close();
+     async destroy() {
+        if(this.pupBrowser){
+            await this.pupBrowser.close();
+        }
         await this.authStrategy.destroy();
     }
 
