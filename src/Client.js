@@ -724,6 +724,7 @@ class Client extends EventEmitter {
                     }));
 
                     return ogMethod(...args);
+                }).bind(module);
             }
         });
     }    
