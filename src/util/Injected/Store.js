@@ -55,6 +55,7 @@ exports.ExposeStore = () => {
     window.Store.Settings = window.require('WAWebUserPrefsGeneral');
     window.Store.BotSecret = window.require('WAWebBotMessageSecret');
     window.Store.BotProfiles = window.require('WAWebBotProfileCollection');
+	window.Store.AddonReactionTable = window.require('WAWebAddonReactionTableMode').reactionTableMode;
     
     window.Store.ForwardUtils = {
         ...window.require('WAWebForwardMessagesToChat')
