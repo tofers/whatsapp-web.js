@@ -116,6 +116,11 @@ class Message extends Base {
          * @type {boolean}
          */
         this.isStarred = data.star;
+        /**
+         * One-time viewing of a message
+         * @type {boolean}
+         */
+        this.isViewOnce = data.isViewOnce ? true : false;
 
         /**
          * Indicates if the message was a broadcast

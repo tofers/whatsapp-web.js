@@ -882,6 +882,8 @@ declare namespace WAWebJS {
         forwardingScore: number,
         /** Indicates if the message was starred */
         isStarred: boolean,
+        /** One-time viewing of a message */
+        isViewOnce: boolean,
         /** Location information contained in the message, if the message is type "location" */
         location: Location,
         /** List of vCards contained in the message */
