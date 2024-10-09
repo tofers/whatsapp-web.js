@@ -63,6 +63,7 @@ exports.ExposeStore = () => {
     window.Store.SendDelete = window.require('WAWebDeleteChatAction');
     window.Store.SendMessage = window.require('WAWebSendMsgChatAction');
     window.Store.EditMessage = window.require('WAWebSendMessageEditAction');
+    window.Store.SendStatus = window.require('WAWebSendStatusMsgAction');
     window.Store.SendSeen = window.require('WAWebUpdateUnreadChatAction');
     window.Store.User = window.require('WAWebUserPrefsMeUser');
     window.Store.ContactMethods = window.require('WAWebContactGetters');
@@ -90,6 +91,7 @@ exports.ExposeStore = () => {
     window.Store.LidUtils = window.require('WAWebApiContact');
     window.Store.WidToJid = window.require('WAWebWidToJid');
     window.Store.JidToWid = window.require('WAWebJidToWid');
+    window.Store.Jids = window.require('WAJids');
     window.Store.getMsgInfo = window.require('WAWebApiMessageInfoStore').queryMsgInfo;
     window.Store.pinUnpinMsg = window.require('WAWebSendPinMessageAction').sendPinInChatMsg;
     window.Store.QueryExist = window.require('WAWebQueryExistsJob').queryWidExists;
