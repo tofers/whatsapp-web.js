@@ -103,6 +103,8 @@ exports.ExposeStore = () => {
     window.Store.UploadUtils = window.require('WAWebUploadManager');
     window.Store.WAWebStreamModel = window.require('WAWebStreamModel');
     window.Store.FindOrCreateChat = window.require('WAWebFindChatAction');
+    window.Store.MediaDataUtils = window.require('WAWebMediaDataUtils');
+    window.Store.BlobCache = window.require('WAWebMediaInMemoryBlobCache');
     
     window.Store.Settings = {
         ...window.require('WAWebUserPrefsGeneral'),
