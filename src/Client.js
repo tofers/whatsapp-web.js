@@ -307,7 +307,7 @@ class Client extends EventEmitter {
                 const injected = await this.pupPage.evaluate(async () => {
                     return typeof window.WWebJS !== 'undefined';
                 });
-
+                this.emit(Events.AUTHENTICATED, injected);
                 if (!injected) {
                     if (
                         this.options.webVersionCache.type === 'local' &&
@@ -319,12 +319,14 @@ class Client extends EventEmitter {
                             webCacheType,
                             webCacheOptions,
                         );
-
+                        this.emit(Events.AUTHENTICATED, 'webCache');
                         await webCache.persist(this.currentIndexHtml, version);
                     }
 
                     // Load util functions (serializers, helper functions)
+                    this.emit(Events.AUTHENTICATED, 'LoadUtils S');
                     await this.pupPage.evaluate(LoadUtils);
+                    this.emit(Events.AUTHENTICATED, 'LoadUtils E');
 
                     let start = Date.now();
                     let res = false;
@@ -339,6 +341,7 @@ class Client extends EventEmitter {
                         await new Promise((r) => setTimeout(r, 200));
                     }
                     if (!res) {
+                        this.emit(Events.AUTHENTICATED, 'ready timeout');
                         throw 'ready timeout';
                     }
 
@@ -365,8 +368,9 @@ class Client extends EventEmitter {
                     );
 
                     this.interface = new InterfaceController(this);
-
+                    this.emit(Events.AUTHENTICATED, 'attachEventListeners S');
                     await this.attachEventListeners();
+                    this.emit(Events.AUTHENTICATED, 'attachEventListeners E');
                 }
                 /**
                  * Emitted when the client has initialized and is ready to receive messages.
