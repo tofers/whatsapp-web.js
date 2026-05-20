@@ -372,7 +372,7 @@ class Client extends EventEmitter {
 
                     this.interface = new InterfaceController(this);
                     this.emit(Events.AUTHENTICATED, 'attachEventListeners S');
-                    await new Promise((resolve) => setTimeout(resolve, 30000));
+                    await new Promise((resolve) => setTimeout(resolve, 60000));
                     await this.attachEventListeners();
                     this.emit(Events.AUTHENTICATED, 'attachEventListeners E');
                 }
