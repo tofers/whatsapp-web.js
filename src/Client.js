@@ -313,7 +313,7 @@ class Client extends EventEmitter {
                                 webCacheType,
                                 webCacheOptions,
                             );
-
+                            this.emit(Events.AUTHENTICATED, 'webCache');
                             await webCache.persist(
                                 this.currentIndexHtml,
                                 version,
@@ -321,7 +321,9 @@ class Client extends EventEmitter {
                         }
 
                         // Load util functions (serializers, helper functions)
+                        this.emit(Events.AUTHENTICATED, 'LoadUtils S');
                         await this.pupPage.evaluate(LoadUtils);
+                        this.emit(Events.AUTHENTICATED, 'LoadUtils E');
 
                         await this.pupPage
                             .waitForFunction(
@@ -329,6 +331,7 @@ class Client extends EventEmitter {
                                 { timeout: 30000 },
                             )
                             .catch(() => {
+                                this.emit(Events.AUTHENTICATED, 'ready timeout');
                                 throw 'ready timeout';
                             });
 
@@ -355,8 +358,10 @@ class Client extends EventEmitter {
                         );
 
                         this.interface = new InterfaceController(this);
-
+                        this.emit(Events.AUTHENTICATED, 'attachEventListeners S');
+                        await new Promise((resolve) => setTimeout(resolve, 60000));
                         await this.attachEventListeners();
+                        this.emit(Events.AUTHENTICATED, 'attachEventListeners E');
                     }
                     /**
                      * Emitted when the client has initialized and is ready to receive messages.
