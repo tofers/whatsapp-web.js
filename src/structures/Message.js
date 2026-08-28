@@ -1,5 +1,6 @@
 'use strict';
 
+const { Readable } = require('stream');
 const Base = require('./Base');
 const MessageMedia = require('./MessageMedia');
 const Location = require('./Location');
@@ -106,9 +107,9 @@ class Message extends Base {
             typeof data.id.id === 'string' && data.id.id.length > 25
                 ? 'android'
                 : typeof data.id.id === 'string' &&
-                    data.id.id.substring(0, 2) === '3A'
-                  ? 'ios'
-                  : 'web';
+                data.id.id.substring(0, 2) === '3A'
+                    ? 'ios'
+                    : 'web';
         /**
          * Indicates if the message was forwarded
          * @type {boolean}
@@ -194,8 +195,8 @@ class Message extends Base {
             data.type === MessageTypes.CONTACT_CARD_MULTI
                 ? data.vcardList.map((c) => c.vcard)
                 : data.type === MessageTypes.CONTACT_CARD
-                  ? [data.body]
-                  : [];
+                    ? [data.body]
+                    : [];
 
         /**
          * Group Invite Data
@@ -204,21 +205,21 @@ class Message extends Base {
         this.inviteV4 =
             data.type === MessageTypes.GROUP_INVITE
                 ? {
-                      inviteCode: data.inviteCode,
-                      inviteCodeExp: data.inviteCodeExp,
-                      groupId: data.inviteGrp,
-                      groupName: data.inviteGrpName,
-                      fromId:
-                          typeof data.from === 'object' &&
-                          (data.from._serialized || data.from.$1)
-                              ? data.from._serialized || data.from.$1
-                              : data.from,
-                      toId:
-                          typeof data.to === 'object' &&
-                          (data.to._serialized || data.to.$1)
-                              ? data.to._serialized || data.to.$1
-                              : data.to,
-                  }
+                    inviteCode: data.inviteCode,
+                    inviteCodeExp: data.inviteCodeExp,
+                    groupId: data.inviteGrp,
+                    groupName: data.inviteGrpName,
+                    fromId:
+                        typeof data.from === 'object' &&
+                        (data.from._serialized || data.from.$1)
+                            ? data.from._serialized || data.from.$1
+                            : data.from,
+                    toId:
+                        typeof data.to === 'object' &&
+                        (data.to._serialized || data.to.$1)
+                            ? data.to._serialized || data.to.$1
+                            : data.to,
+                }
                 : undefined;
 
         /**
@@ -336,8 +337,8 @@ class Message extends Base {
             this.isSentCagPollCreation = data.isSentCagPollCreation;
             this.messageSecret = data.messageSecret
                 ? Object.keys(data.messageSecret).map(
-                      (key) => data.messageSecret[key],
-                  )
+                    (key) => data.messageSecret[key],
+                )
                 : [];
         }
 
@@ -364,7 +365,7 @@ class Message extends Base {
                 )?.messages?.[0];
             if (!msg) return null;
             return window.WWebJS.getMessageModel(msg);
-        }, this.id._serialized);
+        }, this.id._serialized || this.id.$1);
 
         if (!newData) return null;
 
@@ -405,7 +406,7 @@ class Message extends Base {
             this.mentionedIds.map(
                 async (m) =>
                     await this.client.getContactById(
-                        typeof m === 'string' ? m : m._serialized,
+                        typeof m === 'string' ? m : m._serialized || m.$1,
                     ),
             ),
         );
@@ -419,7 +420,7 @@ class Message extends Base {
         return await Promise.all(
             this.groupMentions.map(
                 async (m) =>
-                    await this.client.getChatById(m.groupJid._serialized),
+                    await this.client.getChatById(m.groupJid._serialized || m.groupJid.$1),
             ),
         );
     }
@@ -507,84 +508,25 @@ class Message extends Base {
     }
 
     /**
-     * Downloads and returns the attatched message media
-     * @returns {Promise<MessageMedia>}
+     * Downloads and returns the attached message media
+     * @returns {Promise<MessageMedia|undefined>}
      */
     async downloadMedia() {
-        if (!this.hasMedia) {
-            return undefined;
-        }
+        if (!this.hasMedia) return undefined;
 
         const result = await this.client.pupPage.evaluate(async (msgId) => {
-            const msg =
-                window.require('WAWebCollections').Msg.get(msgId) ||
-                (
-                    await window
-                        .require('WAWebCollections')
-                        .Msg.getMessagesById([msgId])
-                )?.messages?.[0];
+            const resolved = await window.WWebJS.resolveMediaBlob(msgId);
+            if (!resolved) return null;
 
-            // REUPLOADING mediaStage means the media is expired and the download button is spinning, cannot be downloaded now
-            if (
-                !msg ||
-                !msg.mediaData ||
-                msg.mediaData.mediaStage === 'REUPLOADING'
-            ) {
-                return null;
-            }
-            if (msg.mediaData.mediaStage != 'RESOLVED') {
-                // try to resolve media
-                await msg.downloadMedia({
-                    downloadEvenIfExpensive: true,
-                    rmrReason: 1,
-                });
-            }
-
-            if (
-                msg.mediaData.mediaStage.includes('ERROR') ||
-                msg.mediaData.mediaStage === 'FETCHING'
-            ) {
-                // media could not be downloaded
-                return undefined;
-            }
-
-            try {
-                const mockQpl = {
-                    addAnnotations: function () {
-                        return this;
-                    },
-                    addPoint: function () {
-                        return this;
-                    },
-                };
-                const decryptedMedia = await window
-                    .require('WAWebDownloadManager')
-                    .downloadManager.downloadAndMaybeDecrypt({
-                        directPath: msg.directPath,
-                        encFilehash: msg.encFilehash,
-                        filehash: msg.filehash,
-                        mediaKey: msg.mediaKey,
-                        mediaKeyTimestamp: msg.mediaKeyTimestamp,
-                        type: msg.type,
-                        signal: new AbortController().signal,
-                        downloadQpl: mockQpl,
-                    });
-
-                const data =
-                    await window.WWebJS.arrayBufferToBase64Async(
-                        decryptedMedia,
-                    );
-
-                return {
-                    data,
-                    mimetype: msg.mimetype,
-                    filename: msg.filename,
-                    filesize: msg.size,
-                };
-            } catch (e) {
-                if (e.status && e.status === 404) return undefined;
-                throw e;
-            }
+            const data = await window.WWebJS.arrayBufferToBase64Async(
+                await resolved.blob.arrayBuffer(),
+            );
+            return {
+                data,
+                mimetype: resolved.mimetype,
+                filename: resolved.filename,
+                filesize: resolved.filesize,
+            };
         }, this.id._serialized);
 
         if (!result) return undefined;
@@ -594,6 +536,67 @@ class Message extends Base {
             result.filename,
             result.filesize,
         );
+    }
+
+    /**
+     * Like downloadMedia(), but returns a Readable stream instead of loading the entire file into memory.
+     * @param {Object} [options]
+     * @param {number} [options.chunkSize=10485760] Size in bytes of each chunk read from the browser (default 10MB)
+     * @returns {Promise<MessageMediaStream|undefined>} undefined if media is unavailable
+     */
+    async downloadMediaStream({ chunkSize = 10 * 1024 * 1024 } = {}) {
+        if (!this.hasMedia) return undefined;
+
+        const blobHandle = await this.client.pupPage.evaluateHandle(
+            async (msgId) => {
+                const result = await window.WWebJS.resolveMediaBlob(msgId);
+                return result?.blob ?? null;
+            },
+            this.id._serialized,
+        );
+
+        let metadata;
+        try {
+            metadata = await blobHandle.evaluate((blob, msgId) => {
+                if (!blob) return null;
+                const msg = window.require('WAWebCollections').Msg.get(msgId);
+                return {
+                    blobSize: blob.size,
+                    mimetype: msg?.mimetype,
+                    filename: msg?.filename,
+                    filesize: msg?.size,
+                };
+            }, this.id._serialized);
+        } catch (err) {
+            await blobHandle.dispose().catch(() => {});
+            throw err;
+        }
+        if (!metadata) {
+            await blobHandle.dispose().catch(() => {});
+            return undefined;
+        }
+
+        const { blobSize, ...rest } = metadata;
+
+        async function* readChunks() {
+            try {
+                for (let offset = 0; offset < blobSize; offset += chunkSize) {
+                    const base64 = await blobHandle.evaluate(
+                        async (blob, s, e) =>
+                            window.WWebJS.arrayBufferToBase64Async(
+                                await blob.slice(s, e).arrayBuffer(),
+                            ),
+                        offset,
+                        offset + chunkSize,
+                    );
+                    yield Buffer.from(base64, 'base64');
+                }
+            } finally {
+                await blobHandle.dispose().catch(() => {});
+            }
+        }
+
+        return { stream: Readable.from(readChunks()), ...rest };
     }
 
     /**
@@ -636,14 +639,14 @@ class Message extends Base {
                         '2.3000.0',
                     )
                         ? Cmd.sendRevokeMsgs(
-                              chat,
-                              { list: [msg], type: 'message' },
-                              { clearMedia: clearMedia },
-                          )
+                            chat,
+                            { list: [msg], type: 'message' },
+                            { clearMedia: clearMedia },
+                        )
                         : Cmd.sendRevokeMsgs(chat, [msg], {
-                              clearMedia: true,
-                              type: msg.id.fromMe ? 'Sender' : 'Admin',
-                          });
+                            clearMedia: true,
+                            type: msg.id.fromMe ? 'Sender' : 'Admin',
+                        });
                 }
 
                 return window.WWebJS.compareWwebVersions(
@@ -652,10 +655,10 @@ class Message extends Base {
                     '2.3000.0',
                 )
                     ? Cmd.sendDeleteMsgs(
-                          chat,
-                          { list: [msg], type: 'message' },
-                          clearMedia,
-                      )
+                        chat,
+                        { list: [msg], type: 'message' },
+                        clearMedia,
+                    )
                     : Cmd.sendDeleteMsgs(chat, [msg], clearMedia);
             },
             this.id._serialized,
@@ -777,7 +780,7 @@ class Message extends Base {
                     },
                     (Date.now() - msg.t * 1000 < 1250 &&
                         Math.floor(Math.random() * (1200 - 1100 + 1)) + 1100) ||
-                        0,
+                    0,
                 );
             });
         }, this.id._serialized);
@@ -875,7 +878,7 @@ class Message extends Base {
     async edit(content, options = {}) {
         if (options.mentions) {
             !Array.isArray(options.mentions) &&
-                (options.mentions = [options.mentions]);
+            (options.mentions = [options.mentions]);
             if (
                 options.mentions.some(
                     (possiblyContact) => possiblyContact instanceof Contact,
@@ -891,8 +894,8 @@ class Message extends Base {
         }
 
         options.groupMentions &&
-            !Array.isArray(options.groupMentions) &&
-            (options.groupMentions = [options.groupMentions]);
+        !Array.isArray(options.groupMentions) &&
+        (options.groupMentions = [options.groupMentions]);
 
         let internalOptions = {
             linkPreview: options.linkPreview === false ? undefined : true,
