@@ -178,7 +178,7 @@ class Client extends EventEmitter {
                         );
                 });
             }
-            state = window.require('WAWebSocketModel').Socket.state;
+            state = getState();
             return state == 'UNPAIRED' || state == 'UNPAIRED_IDLE';
         });
 
